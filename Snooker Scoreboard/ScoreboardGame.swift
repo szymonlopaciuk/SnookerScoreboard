@@ -27,9 +27,12 @@ enum PotRequirement: Equatable {
 
 struct ScoreAction {
     let targetDeltas: [UUID: Int]
+    let foulDeltas: [UUID: Int]
     let previousCurrentIndex: Int
     let previousRedsRemaining: Int
     let previousRequirement: PotRequirement
+    let previousCurrentBreaks: [UUID: Int]
+    let previousHighestBreaks: [UUID: Int]
     let kind: ScoreActionKind
 }
 
@@ -54,6 +57,9 @@ final class ScoreboardGame: ObservableObject {
     @Published var gameStarted = false
     @Published var currentPlayerIndex = 0
     @Published var actionHistory: [ScoreAction] = []
+    @Published var foulCounts: [UUID: Int] = [:]
+    @Published var currentBreaks: [UUID: Int] = [:]
+    @Published var highestBreaks: [UUID: Int] = [:]
     @Published var redsRemaining = 15
     @Published var potRequirement: PotRequirement = .red
     @Published var gameOver = false
@@ -74,15 +80,28 @@ final class ScoreboardGame: ObservableObject {
     func addPlayer(name: String) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return }
-        players.append(Player(name: trimmedName))
+        let player = Player(name: trimmedName)
+        players.append(player)
+        foulCounts[player.id] = 0
+        currentBreaks[player.id] = 0
+        highestBreaks[player.id] = 0
     }
 
     func deletePlayers(at offsets: IndexSet) {
+        for index in offsets {
+            let id = players[index].id
+            foulCounts[id] = nil
+            currentBreaks[id] = nil
+            highestBreaks[id] = nil
+        }
         players.remove(atOffsets: offsets)
     }
 
     func removePlayer(id: UUID) {
         players.removeAll { $0.id == id }
+        foulCounts[id] = nil
+        currentBreaks[id] = nil
+        highestBreaks[id] = nil
     }
 
     func startGame() {
@@ -91,8 +110,15 @@ final class ScoreboardGame: ObservableObject {
         gameOver = false
         currentPlayerIndex = 0
         actionHistory.removeAll()
+        foulCounts = Dictionary(uniqueKeysWithValues: players.map { ($0.id, 0) })
+        currentBreaks = Dictionary(uniqueKeysWithValues: players.map { ($0.id, 0) })
+        highestBreaks = Dictionary(uniqueKeysWithValues: players.map { ($0.id, 0) })
         redsRemaining = 15
         potRequirement = .red
+        if ProcessInfo.processInfo.arguments.contains("UITestShortGame") {
+            redsRemaining = 0
+            potRequirement = .colorSequence(index: 5)
+        }
         for index in players.indices {
             players[index].score = 0
         }
@@ -103,6 +129,9 @@ final class ScoreboardGame: ObservableObject {
         gameOver = false
         actionHistory.removeAll()
         currentPlayerIndex = 0
+        foulCounts = Dictionary(uniqueKeysWithValues: players.map { ($0.id, 0) })
+        currentBreaks = Dictionary(uniqueKeysWithValues: players.map { ($0.id, 0) })
+        highestBreaks = Dictionary(uniqueKeysWithValues: players.map { ($0.id, 0) })
         redsRemaining = 15
         potRequirement = .red
         for index in players.indices {
@@ -117,13 +146,24 @@ final class ScoreboardGame: ObservableObject {
         }
         let previousIndex = currentPlayerIndex
         let targetIndex = currentPlayerIndex
+        let targetID = players[targetIndex].id
         players[targetIndex].score += points
+        let previousCurrentBreak = currentBreaks[targetID, default: 0]
+        let previousHighestBreak = highestBreaks[targetID, default: 0]
+        let newCurrentBreak = previousCurrentBreak + points
+        currentBreaks[targetID] = newCurrentBreak
+        if newCurrentBreak > previousHighestBreak {
+            highestBreaks[targetID] = newCurrentBreak
+        }
         let kind = ScoreActionKind.pot(playerID: players[targetIndex].id, ballName: ballName, ballColor: ballColor, points: points)
         let action = ScoreAction(
             targetDeltas: [players[targetIndex].id: points],
+            foulDeltas: [:],
             previousCurrentIndex: previousIndex,
             previousRedsRemaining: redsRemaining,
             previousRequirement: potRequirement,
+            previousCurrentBreaks: [targetID: previousCurrentBreak],
+            previousHighestBreaks: [targetID: previousHighestBreak],
             kind: kind
         )
         actionHistory.append(action)
@@ -135,15 +175,23 @@ final class ScoreboardGame: ObservableObject {
         let previousIndex = currentPlayerIndex
         let foulPoints = abs(points)
         let foulingPlayerID = players[currentPlayerIndex].id
+        foulCounts[foulingPlayerID, default: 0] += 1
+        let previousCurrentBreak = currentBreaks[foulingPlayerID, default: 0]
+        let previousHighestBreak = highestBreaks[foulingPlayerID, default: 0]
+        currentBreaks[foulingPlayerID] = 0
+        let foulDelta = [foulingPlayerID: 1]
         switch foulAwardPolicy {
         case .nextPlayer:
             let nextIndex = (currentPlayerIndex + 1) % players.count
             players[nextIndex].score += foulPoints
             let action = ScoreAction(
                 targetDeltas: [players[nextIndex].id: foulPoints],
+                foulDeltas: foulDelta,
                 previousCurrentIndex: previousIndex,
                 previousRedsRemaining: redsRemaining,
                 previousRequirement: potRequirement,
+                previousCurrentBreaks: [foulingPlayerID: previousCurrentBreak],
+                previousHighestBreaks: [foulingPlayerID: previousHighestBreak],
                 kind: .foul(playerID: foulingPlayerID, points: foulPoints)
             )
             actionHistory.append(action)
@@ -154,9 +202,12 @@ final class ScoreboardGame: ObservableObject {
             let targetDeltas = Dictionary(uniqueKeysWithValues: players.map { ($0.id, foulPoints) })
             let action = ScoreAction(
                 targetDeltas: targetDeltas,
+                foulDeltas: foulDelta,
                 previousCurrentIndex: previousIndex,
                 previousRedsRemaining: redsRemaining,
                 previousRequirement: potRequirement,
+                previousCurrentBreaks: [foulingPlayerID: previousCurrentBreak],
+                previousHighestBreaks: [foulingPlayerID: previousHighestBreak],
                 kind: .foul(playerID: foulingPlayerID, points: foulPoints)
             )
             actionHistory.append(action)
@@ -174,6 +225,15 @@ final class ScoreboardGame: ObservableObject {
                 players[targetIndex].score -= delta
             }
         }
+        for (targetID, delta) in lastAction.foulDeltas {
+            foulCounts[targetID, default: 0] -= delta
+        }
+        for (targetID, value) in lastAction.previousCurrentBreaks {
+            currentBreaks[targetID] = value
+        }
+        for (targetID, value) in lastAction.previousHighestBreaks {
+            highestBreaks[targetID] = value
+        }
         currentPlayerIndex = min(lastAction.previousCurrentIndex, max(players.count - 1, 0))
         redsRemaining = lastAction.previousRedsRemaining
         potRequirement = lastAction.previousRequirement
@@ -182,6 +242,8 @@ final class ScoreboardGame: ObservableObject {
 
     func advanceTurn() {
         guard gameStarted, !gameOver, !players.isEmpty else { return }
+        let currentPlayerID = players[currentPlayerIndex].id
+        currentBreaks[currentPlayerID] = 0
         currentPlayerIndex = (currentPlayerIndex + 1) % players.count
         if enforceRules, redsRemaining > 0 {
             potRequirement = .red
@@ -190,6 +252,14 @@ final class ScoreboardGame: ObservableObject {
 
     func playerName(for playerID: UUID) -> String {
         players.first(where: { $0.id == playerID })?.name ?? "Unknown"
+    }
+
+    func foulCount(for playerID: UUID) -> Int {
+        foulCounts[playerID, default: 0]
+    }
+
+    func highestBreak(for playerID: UUID) -> Int {
+        highestBreaks[playerID, default: 0]
     }
 
     var allowedPotNames: Set<String> {

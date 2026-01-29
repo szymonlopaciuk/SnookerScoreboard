@@ -10,12 +10,7 @@ import XCTest
 final class Snooker_ScoreboardUITests: XCTestCase {
 
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
     }
 
     override func tearDownWithError() throws {
@@ -23,19 +18,43 @@ final class Snooker_ScoreboardUITests: XCTestCase {
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+    func testFinalScoreDialogShowsSharedGoldCrownsOnTie() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["UITestEnforceRules", "UITestShortGame"]
         app.launch()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        addPlayer(named: "John", in: app)
+        addPlayer(named: "Anna", in: app)
+
+        app.buttons["start-game-button"].click()
+
+        let foulOnBlack = app.buttons["foul-black"]
+        XCTAssertTrue(foulOnBlack.waitForExistence(timeout: 2))
+        foulOnBlack.click()
+
+        let endTurn = app.buttons["end-turn-button"]
+        XCTAssertTrue(endTurn.waitForExistence(timeout: 2))
+        endTurn.click()
+
+        let potBlack = app.buttons["pot-black"]
+        XCTAssertTrue(potBlack.waitForExistence(timeout: 2))
+        potBlack.click()
+
+        let finalSheet = app.otherElements["final-score-sheet"]
+        XCTAssertTrue(finalSheet.waitForExistence(timeout: 2))
+        XCTAssertTrue(app.images["final-crown-gold-John"].exists)
+        XCTAssertTrue(app.images["final-crown-gold-Anna"].exists)
+        XCTAssertFalse(app.images["final-crown-silver-John"].exists)
+        XCTAssertFalse(app.images["final-crown-bronze-John"].exists)
+        XCTAssertTrue(app.buttons["final-start-new-game"].exists)
     }
 
     @MainActor
-    func testLaunchPerformance() throws {
-        // This measures how long it takes to launch your application.
-        measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
-        }
+    private func addPlayer(named name: String, in app: XCUIApplication) {
+        let nameField = app.textFields["player-name-field"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 2))
+        nameField.click()
+        nameField.typeText(name)
+        app.buttons["add-player-button"].click()
     }
 }

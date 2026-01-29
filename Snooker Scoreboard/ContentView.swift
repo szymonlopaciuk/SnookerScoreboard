@@ -5,6 +5,7 @@
 //  Created by Szymon Łopaciuk on 29/01/2026.
 //
 
+import Foundation
 import SwiftUI
 
 struct ScoreOption: Identifiable {
@@ -74,6 +75,7 @@ struct ContentView: View {
                     Label("Start Game", systemImage: "play.fill")
                 }
                     .disabled(game.gameStarted || !hasEnoughPlayers)
+                    .accessibilityIdentifier("start-game-button")
                 Button(action: resetGame) {
                     Label("New Game", systemImage: "xmark.octagon.fill")
                 }
@@ -96,6 +98,10 @@ struct ContentView: View {
         .onAppear {
             game.foulAwardPolicy = FoulAwardPolicy(rawValue: foulAwardPolicyRaw) ?? .nextPlayer
             game.enforceRules = enforceSnookerRules
+            if ProcessInfo.processInfo.arguments.contains("UITestEnforceRules") {
+                enforceSnookerRules = true
+                game.enforceRules = true
+            }
             gameIsActive = game.gameStarted
         }
         .onChange(of: foulAwardPolicyRaw) { newValue in
@@ -176,8 +182,10 @@ struct ContentView: View {
                 TextField("Player name", text: $newPlayerName)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit(addPlayer)
+                    .accessibilityIdentifier("player-name-field")
                 Button("Add", action: addPlayer)
                     .disabled(newPlayerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .accessibilityIdentifier("add-player-button")
             }
             if !hasEnoughPlayers {
                 Text("Add at least two players to start.")
@@ -211,6 +219,7 @@ struct ContentView: View {
                         }
                     }
                     .disabled(isPotDisabled(option: option))
+                    .accessibilityIdentifier("pot-\(option.name.lowercased())")
                 }
             }
             Text("Foul")
@@ -230,6 +239,7 @@ struct ContentView: View {
                         }
                     }
                     .disabled(isFoulDisabled(option: option))
+                    .accessibilityIdentifier(foulIdentifier(for: option))
                 }
             }
             Spacer()
@@ -239,6 +249,7 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity, alignment: .center)
             .disabled(!game.gameStarted || game.players.isEmpty)
+            .accessibilityIdentifier("end-turn-button")
         }
         .padding()
         .background(.thinMaterial)
@@ -357,6 +368,13 @@ struct ContentView: View {
         return option.name
     }
 
+    private func foulIdentifier(for option: ScoreOption) -> String {
+        if let ballName = foulBallName(for: option) {
+            return "foul-\(ballName.lowercased())"
+        }
+        return "foul-base"
+    }
+
     private func isFoulDisabled(option: ScoreOption) -> Bool {
         if !game.gameStarted || game.gameOver { return true }
         if !game.enforceRules { return false }
@@ -378,27 +396,39 @@ struct ContentView: View {
             List {
                 ForEach(Array(finalResults.enumerated()), id: \.element.id) { index, player in
                     HStack {
-                        if let crownColor = crownColor(for: index) {
+                        if let crownName = crownName(for: player, in: finalResults),
+                           let crownColor = crownColor(for: crownName) {
                             Image(systemName: "crown.fill")
                                 .foregroundStyle(crownColor)
+                                .accessibilityIdentifier("final-crown-\(crownName)-\(player.name)")
                         }
                         Text(player.name)
                         Spacer()
-                        Text("\(player.score)")
-                            .font(.headline)
-                            .monospacedDigit()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("\(player.score)")
+                                .font(.headline)
+                                .monospacedDigit()
+                            Text("Fouls: \(game.foulCount(for: player.id))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text("Highest break: \(game.highestBreak(for: player.id))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
         }
         .padding(20)
         .frame(minWidth: 360, minHeight: 300)
+        .accessibilityIdentifier("final-score-sheet")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Start New Game") {
                     resetGame()
                     showGameOver = false
                 }
+                .accessibilityIdentifier("final-start-new-game")
             }
         }
     }
@@ -412,13 +442,39 @@ struct ContentView: View {
         }
     }
 
-    private func crownColor(for index: Int) -> Color? {
-        switch index {
-        case 0:
-            return .yellow
+    private func crownName(for player: Player, in players: [Player]) -> String? {
+        let groups = Dictionary(grouping: players, by: \.score)
+            .sorted { $0.key > $1.key }
+        guard let groupIndex = groups.firstIndex(where: { group in
+            group.value.contains(where: { $0.id == player.id })
+        }) else {
+            return nil
+        }
+
+        if groupIndex == 0 {
+            return "gold"
+        }
+        if groups.first?.value.count ?? 0 > 1 {
+            return groupIndex == 1 ? "bronze" : nil
+        }
+
+        switch groupIndex {
         case 1:
-            return .gray
+            return "silver"
         case 2:
+            return "bronze"
+        default:
+            return nil
+        }
+    }
+
+    private func crownColor(for crownName: String) -> Color? {
+        switch crownName {
+        case "gold":
+            return .yellow
+        case "silver":
+            return .gray
+        case "bronze":
             return .brown
         default:
             return nil

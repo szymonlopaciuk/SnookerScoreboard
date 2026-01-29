@@ -22,6 +22,7 @@ struct Snooker_ScoreboardTests {
         #expect(game.currentPlayerIndex == 0)
         #expect(game.players[0].score == 1)
         #expect(game.players[1].score == 0)
+        #expect(game.highestBreak(for: game.players[0].id) == 1)
         #expect(game.actionHistory.count == 1)
     }
 
@@ -37,6 +38,7 @@ struct Snooker_ScoreboardTests {
         #expect(game.currentPlayerIndex == 1)
         #expect(game.players[0].score == 0)
         #expect(game.players[1].score == 4)
+        #expect(game.foulCount(for: game.players[0].id) == 1)
         #expect(game.actionHistory.count == 1)
     }
 
@@ -61,11 +63,60 @@ struct Snooker_ScoreboardTests {
         game.startGame()
 
         game.applyPot(ballName: "Blue", ballColor: .blue, points: 5)
+        game.applyFoul(points: -4)
         game.undoLastAction()
 
         #expect(game.players[0].score == 0)
         #expect(game.currentPlayerIndex == 0)
+        #expect(game.foulCount(for: game.players[0].id) == 0)
+        #expect(game.highestBreak(for: game.players[0].id) == 5)
         #expect(game.actionHistory.isEmpty)
+    }
+
+    @Test func highestBreakResetsOnEndTurn() async throws {
+        let game = ScoreboardGame()
+        game.addPlayer(name: "John")
+        game.addPlayer(name: "Anna")
+        game.startGame()
+
+        game.applyPot(ballName: "Red", ballColor: .red, points: 1)
+        game.applyPot(ballName: "Black", ballColor: .black, points: 7)
+        game.advanceTurn()
+        game.applyPot(ballName: "Red", ballColor: .red, points: 1)
+
+        #expect(game.highestBreak(for: game.players[0].id) == 8)
+        #expect(game.currentBreaks[game.players[0].id] == 0)
+    }
+
+    @Test func foulResetsCurrentBreakButKeepsHighest() async throws {
+        let game = ScoreboardGame()
+        game.addPlayer(name: "John")
+        game.addPlayer(name: "Anna")
+        game.startGame()
+
+        game.applyPot(ballName: "Red", ballColor: .red, points: 1)
+        game.applyPot(ballName: "Black", ballColor: .black, points: 7)
+        game.applyFoul(points: -4)
+
+        #expect(game.highestBreak(for: game.players[0].id) == 8)
+        #expect(game.currentBreaks[game.players[0].id] == 0)
+        #expect(game.foulCount(for: game.players[0].id) == 1)
+    }
+
+    @Test func undoFoulRestoresBreakAndHighest() async throws {
+        let game = ScoreboardGame()
+        game.addPlayer(name: "John")
+        game.addPlayer(name: "Anna")
+        game.startGame()
+
+        game.applyPot(ballName: "Red", ballColor: .red, points: 1)
+        game.applyPot(ballName: "Black", ballColor: .black, points: 7)
+        game.applyFoul(points: -4)
+        game.undoLastAction()
+
+        #expect(game.highestBreak(for: game.players[0].id) == 8)
+        #expect(game.currentBreaks[game.players[0].id] == 8)
+        #expect(game.foulCount(for: game.players[0].id) == 0)
     }
 
     @Test func enforceRulesBlocksInvalidPots() async throws {
