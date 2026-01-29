@@ -17,11 +17,10 @@ Native macOS scoreboard for casual snooker sessions. Add players, track pots and
 
 ## UI Preview
 
-### New Game
 ![New game screen](Screenshots/new_game.png)
 
-### In‑game Scoring
 ![Game view](Screenshots/game_view.png)
 
-### Game History
+![Final score dialog](Screenshots/final_score.png)
+
 ![Game history dialog](Screenshots/game_history.png)
