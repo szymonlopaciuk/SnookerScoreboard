@@ -68,4 +68,75 @@ struct Snooker_ScoreboardTests {
         #expect(game.actionHistory.isEmpty)
     }
 
+    @Test func enforceRulesBlocksInvalidPots() async throws {
+        let game = ScoreboardGame()
+        game.addPlayer(name: "John")
+        game.addPlayer(name: "Anna")
+        game.startGame()
+        game.enforceRules = true
+
+        game.applyPot(ballName: "Blue", ballColor: .blue, points: 5)
+
+        #expect(game.players[0].score == 0)
+        #expect(game.actionHistory.isEmpty)
+        #expect(game.redsRemaining == 15)
+    }
+
+    @Test func enforceRulesAlternatesRedAndColor() async throws {
+        let game = ScoreboardGame()
+        game.addPlayer(name: "John")
+        game.addPlayer(name: "Anna")
+        game.startGame()
+        game.enforceRules = true
+
+        game.applyPot(ballName: "Red", ballColor: .red, points: 1)
+        game.applyPot(ballName: "Blue", ballColor: .blue, points: 5)
+
+        #expect(game.players[0].score == 6)
+        #expect(game.redsRemaining == 14)
+        #expect(game.potRequirement == .red)
+    }
+
+    @Test func enforceRulesRunsColorSequenceAfterReds() async throws {
+        let game = ScoreboardGame()
+        game.addPlayer(name: "John")
+        game.addPlayer(name: "Anna")
+        game.startGame()
+        game.enforceRules = true
+        game.redsRemaining = 1
+        game.potRequirement = .red
+
+        game.applyPot(ballName: "Red", ballColor: .red, points: 1)
+        game.applyPot(ballName: "Yellow", ballColor: .yellow, points: 2)
+
+        #expect(game.redsRemaining == 0)
+        #expect(game.potRequirement == .colorSequence(index: 1))
+    }
+
+    @Test func removePlayerRemovesBeforeStart() async throws {
+        let game = ScoreboardGame()
+        game.addPlayer(name: "John")
+        game.addPlayer(name: "Anna")
+
+        game.removePlayer(id: game.players[0].id)
+
+        #expect(game.players.count == 1)
+        #expect(game.players.first?.name == "Anna")
+    }
+
+    @Test func gameEndsAfterFinalBlackInSequence() async throws {
+        let game = ScoreboardGame()
+        game.addPlayer(name: "John")
+        game.addPlayer(name: "Anna")
+        game.startGame()
+        game.enforceRules = true
+        game.redsRemaining = 0
+        game.potRequirement = .colorSequence(index: 5)
+
+        game.applyPot(ballName: "Black", ballColor: .black, points: 7)
+
+        #expect(game.gameOver)
+        #expect(!game.gameStarted)
+    }
+
 }

@@ -17,8 +17,11 @@ struct ScoreOption: Identifiable {
 struct ContentView: View {
     @State private var newPlayerName = ""
     @State private var showHistory = false
+    @State private var showGameOver = false
     @StateObject private var game = ScoreboardGame()
     @AppStorage("foulAwardPolicy") private var foulAwardPolicyRaw = FoulAwardPolicy.nextPlayer.rawValue
+    @AppStorage("enforceSnookerRules") private var enforceSnookerRules = false
+    @AppStorage("gameIsActive") private var gameIsActive = false
 
     private let potOptions: [ScoreOption] = [
         ScoreOption(name: "Red", points: 1, colors: [.red]),
@@ -87,11 +90,27 @@ struct ContentView: View {
         .sheet(isPresented: $showHistory) {
             historySheet
         }
+        .sheet(isPresented: $showGameOver) {
+            gameOverSheet
+        }
         .onAppear {
             game.foulAwardPolicy = FoulAwardPolicy(rawValue: foulAwardPolicyRaw) ?? .nextPlayer
+            game.enforceRules = enforceSnookerRules
+            gameIsActive = game.gameStarted
         }
         .onChange(of: foulAwardPolicyRaw) { newValue in
             game.foulAwardPolicy = FoulAwardPolicy(rawValue: newValue) ?? .nextPlayer
+        }
+        .onChange(of: enforceSnookerRules) { newValue in
+            game.enforceRules = newValue
+        }
+        .onChange(of: game.gameOver) { newValue in
+            if newValue {
+                showGameOver = true
+            }
+        }
+        .onChange(of: game.gameStarted) { newValue in
+            gameIsActive = newValue
         }
     }
 
@@ -123,6 +142,15 @@ struct ContentView: View {
             }
             Spacer()
             HStack(spacing: 6) {
+                if !game.gameStarted {
+                    Button {
+                        game.removePlayer(id: player.id)
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                }
                 if game.gameStarted, isLeading(player: player) {
                     Image(systemName: "crown.fill")
                         .foregroundStyle(.yellow)
@@ -168,25 +196,26 @@ struct ContentView: View {
             Text("Pot")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 90), spacing: 12)], spacing: 12) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: 12)], spacing: 12) {
                 ForEach(potOptions) { option in
                     Button {
                         applyPot(option: option)
                     } label: {
                         HStack {
                             scoreColorDots(colors: option.colors)
-                            Text(option.name)
+                            Text(potLabel(for: option))
                             Spacer()
                             Text("+\(option.points)")
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .disabled(isPotDisabled(option: option))
                 }
             }
             Text("Foul")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 90), spacing: 12)], spacing: 12) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: 12)], spacing: 12) {
                 ForEach(foulOptions) { option in
                     Button {
                         applyFoul(points: option.points)
@@ -309,6 +338,73 @@ struct ContentView: View {
 
     private func playerName(for playerID: UUID) -> String {
         game.playerName(for: playerID)
+    }
+
+    private func isPotDisabled(option: ScoreOption) -> Bool {
+        if !game.gameStarted || game.gameOver { return true }
+        if !game.enforceRules { return false }
+        return !game.allowedPotNames.contains(option.name)
+    }
+
+    private func potLabel(for option: ScoreOption) -> String {
+        if game.enforceRules, option.name == "Red" {
+            return "Red (\(game.redsRemaining) left)"
+        }
+        return option.name
+    }
+
+    private var gameOverSheet: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Final Score")
+                .font(.title2)
+            List {
+                ForEach(Array(finalResults.enumerated()), id: \.element.id) { index, player in
+                    HStack {
+                        if let crownColor = crownColor(for: index) {
+                            Image(systemName: "crown.fill")
+                                .foregroundStyle(crownColor)
+                        }
+                        Text(player.name)
+                        Spacer()
+                        Text("\(player.score)")
+                            .font(.headline)
+                            .monospacedDigit()
+                    }
+                }
+            }
+        }
+        .padding(20)
+        .frame(minWidth: 360, minHeight: 300)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Start New Game") {
+                    resetGame()
+                    showGameOver = false
+                }
+            }
+        }
+    }
+
+    private var finalResults: [Player] {
+        game.players.sorted { lhs, rhs in
+            if lhs.score != rhs.score {
+                return lhs.score > rhs.score
+            }
+            return lhs.name < rhs.name
+        }
+    }
+
+    private func crownColor(for index: Int) -> Color? {
+        switch index {
+        case 0:
+            return .yellow
+        case 1:
+            return .gray
+        case 2:
+            return .brown
+        default:
+            return nil
+        }
     }
 }
 

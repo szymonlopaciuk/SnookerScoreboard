@@ -17,6 +17,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct Snooker_ScoreboardApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @AppStorage("foulAwardPolicy") private var foulAwardPolicyRaw = FoulAwardPolicy.nextPlayer.rawValue
+    @AppStorage("enforceSnookerRules") private var enforceSnookerRules = false
+    @AppStorage("gameIsActive") private var gameIsActive = false
 
     var body: some Scene {
         WindowGroup {
@@ -31,6 +33,10 @@ struct Snooker_ScoreboardApp: App {
                     }
                 }
                 .pickerStyle(.inline)
+                .disabled(gameIsActive)
+                Divider()
+                Toggle("Enforce Snooker Rules", isOn: $enforceSnookerRules)
+                    .disabled(gameIsActive)
             }
         }
     }
