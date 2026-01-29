@@ -19,10 +19,14 @@ struct Snooker_ScoreboardApp: App {
     @AppStorage("foulAwardPolicy") private var foulAwardPolicyRaw = FoulAwardPolicy.nextPlayer.rawValue
     @AppStorage("enforceSnookerRules") private var enforceSnookerRules = false
     @AppStorage("gameIsActive") private var gameIsActive = false
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
         WindowGroup {
             ContentView()
+        }
+        WindowGroup("Help", id: "help") {
+            HelpView()
         }
         .commands {
             CommandMenu("Game") {
@@ -37,6 +41,11 @@ struct Snooker_ScoreboardApp: App {
                 Divider()
                 Toggle("Enforce Snooker Rules", isOn: $enforceSnookerRules)
                     .disabled(gameIsActive)
+            }
+            CommandGroup(replacing: .help) {
+                Button("Snooker Rules") {
+                    openWindow(id: "help")
+                }
             }
         }
     }

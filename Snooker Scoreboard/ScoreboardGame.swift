@@ -63,6 +63,7 @@ final class ScoreboardGame: ObservableObject {
     @Published var redsRemaining = 15
     @Published var potRequirement: PotRequirement = .red
     @Published var gameOver = false
+    @Published var respottedBlackActive = false
 
     var foulAwardPolicy: FoulAwardPolicy = .nextPlayer
     var enforceRules = false
@@ -108,6 +109,7 @@ final class ScoreboardGame: ObservableObject {
         guard hasEnoughPlayers else { return }
         gameStarted = true
         gameOver = false
+        respottedBlackActive = false
         currentPlayerIndex = 0
         actionHistory.removeAll()
         foulCounts = Dictionary(uniqueKeysWithValues: players.map { ($0.id, 0) })
@@ -127,6 +129,7 @@ final class ScoreboardGame: ObservableObject {
     func resetGame() {
         gameStarted = false
         gameOver = false
+        respottedBlackActive = false
         actionHistory.removeAll()
         currentPlayerIndex = 0
         foulCounts = Dictionary(uniqueKeysWithValues: players.map { ($0.id, 0) })
@@ -238,6 +241,7 @@ final class ScoreboardGame: ObservableObject {
         redsRemaining = lastAction.previousRedsRemaining
         potRequirement = lastAction.previousRequirement
         gameOver = false
+        respottedBlackActive = false
     }
 
     func advanceTurn() {
@@ -264,6 +268,9 @@ final class ScoreboardGame: ObservableObject {
 
     var allowedPotNames: Set<String> {
         guard enforceRules else { return [] }
+        if respottedBlackActive {
+            return ["Black"]
+        }
         if redsRemaining > 0 {
             switch potRequirement {
             case .red:
@@ -292,6 +299,9 @@ final class ScoreboardGame: ObservableObject {
     }
 
     private var availableColorNames: Set<String> {
+        if respottedBlackActive {
+            return ["Black"]
+        }
         if redsRemaining > 0 {
             return Set(colorSequence + ["Red"])
         }
@@ -326,11 +336,22 @@ final class ScoreboardGame: ObservableObject {
             let nextIndex = index + 1
             potRequirement = .colorSequence(index: nextIndex)
             if enforceRules, nextIndex >= colorSequence.count {
-                gameOver = true
-                gameStarted = false
+                if isTieForLead {
+                    respottedBlackActive = true
+                    potRequirement = .colorSequence(index: 5)
+                } else {
+                    gameOver = true
+                    gameStarted = false
+                    respottedBlackActive = false
+                }
             }
         case .red, .color:
             potRequirement = .colorSequence(index: 0)
         }
+    }
+
+    private var isTieForLead: Bool {
+        guard let maxScore = players.map(\.score).max() else { return false }
+        return players.filter { $0.score == maxScore }.count > 1
     }
 }

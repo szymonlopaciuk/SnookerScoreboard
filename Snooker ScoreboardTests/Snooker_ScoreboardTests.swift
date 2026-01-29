@@ -190,6 +190,44 @@ struct Snooker_ScoreboardTests {
         #expect(!game.gameStarted)
     }
 
+    @Test func respottedBlackActivatesOnTie() async throws {
+        let game = ScoreboardGame()
+        game.addPlayer(name: "John")
+        game.addPlayer(name: "Anna")
+        game.startGame()
+        game.enforceRules = true
+        game.redsRemaining = 0
+        game.potRequirement = .colorSequence(index: 5)
+        game.players[0].score = 20
+        game.players[1].score = 20
+
+        game.applyPot(ballName: "Black", ballColor: .black, points: 7)
+
+        #expect(!game.gameOver)
+        #expect(game.gameStarted)
+        #expect(game.respottedBlackActive)
+        #expect(game.allowedPotNames == ["Black"])
+    }
+
+    @Test func respottedBlackEndsWhenTieBreaks() async throws {
+        let game = ScoreboardGame()
+        game.addPlayer(name: "John")
+        game.addPlayer(name: "Anna")
+        game.startGame()
+        game.enforceRules = true
+        game.redsRemaining = 0
+        game.potRequirement = .colorSequence(index: 5)
+        game.players[0].score = 30
+        game.players[1].score = 30
+
+        game.applyPot(ballName: "Black", ballColor: .black, points: 7)
+        game.applyPot(ballName: "Black", ballColor: .black, points: 7)
+
+        #expect(game.gameOver)
+        #expect(!game.gameStarted)
+        #expect(!game.respottedBlackActive)
+    }
+
     @Test func availableColorsShrinkAfterSequenceStarts() async throws {
         let game = ScoreboardGame()
         game.addPlayer(name: "John")
