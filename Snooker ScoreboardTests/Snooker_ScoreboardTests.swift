@@ -139,4 +139,19 @@ struct Snooker_ScoreboardTests {
         #expect(!game.gameStarted)
     }
 
+    @Test func availableColorsShrinkAfterSequenceStarts() async throws {
+        let game = ScoreboardGame()
+        game.addPlayer(name: "John")
+        game.addPlayer(name: "Anna")
+        game.startGame()
+        game.enforceRules = true
+        game.redsRemaining = 0
+        game.potRequirement = .colorSequence(index: 2)
+
+        #expect(!game.isColorOnTable("Yellow"))
+        #expect(!game.isColorOnTable("Green"))
+        #expect(game.isColorOnTable("Brown"))
+        #expect(game.isColorOnTable("Black"))
+    }
+
 }

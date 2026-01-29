@@ -229,6 +229,7 @@ struct ContentView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .disabled(isFoulDisabled(option: option))
                 }
             }
             Spacer()
@@ -354,6 +355,20 @@ struct ContentView: View {
             return "Red (\(game.redsRemaining) left)"
         }
         return option.name
+    }
+
+    private func isFoulDisabled(option: ScoreOption) -> Bool {
+        if !game.gameStarted || game.gameOver { return true }
+        if !game.enforceRules { return false }
+        guard let ballName = foulBallName(for: option) else { return false }
+        return !game.isColorOnTable(ballName)
+    }
+
+    private func foulBallName(for option: ScoreOption) -> String? {
+        if option.name.hasPrefix("Foul on ") {
+            return option.name.replacingOccurrences(of: "Foul on ", with: "")
+        }
+        return nil
     }
 
     private var gameOverSheet: some View {

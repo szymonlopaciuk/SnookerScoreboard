@@ -217,6 +217,25 @@ final class ScoreboardGame: ObservableObject {
         }
     }
 
+    func isColorOnTable(_ name: String) -> Bool {
+        availableColorNames.contains(name)
+    }
+
+    private var availableColorNames: Set<String> {
+        if redsRemaining > 0 {
+            return Set(colorSequence + ["Red"])
+        }
+        switch potRequirement {
+        case let .colorSequence(index):
+            if colorSequence.indices.contains(index) {
+                return Set(colorSequence[index...])
+            }
+            return []
+        case .red, .color:
+            return Set(colorSequence)
+        }
+    }
+
     private func updateRequirement(afterPot ballName: String) {
         if redsRemaining > 0 {
             if ballName == "Red" {
