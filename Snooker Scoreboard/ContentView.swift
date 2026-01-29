@@ -29,15 +29,15 @@ struct ContentView: View {
         ScoreOption(name: "Green", points: 3, colors: [.green]),
         ScoreOption(name: "Brown", points: 4, colors: [.brown]),
         ScoreOption(name: "Blue", points: 5, colors: [.blue]),
-        ScoreOption(name: "Pink", points: 6, colors: [.pink]),
+        ScoreOption(name: "Pink", points: 6, colors: [Color(red: 1.0, green: 0.45, blue: 0.7)]),
         ScoreOption(name: "Black", points: 7, colors: [.black])
     ]
 
     private let foulOptions: [ScoreOption] = [
-        ScoreOption(name: "Foul", points: -4, colors: []),
-        ScoreOption(name: "Blue", points: -5, colors: [.blue]),
-        ScoreOption(name: "Pink", points: -6, colors: [.pink]),
-        ScoreOption(name: "Black", points: -7, colors: [.black])
+        ScoreOption(name: "Foul", points: -4, colors: [.white, .red, .yellow, .green, .brown]),
+        ScoreOption(name: "Foul on Blue", points: -5, colors: [.blue]),
+        ScoreOption(name: "Foul on Pink", points: -6, colors: [Color(red: 1.0, green: 0.45, blue: 0.7)]),
+        ScoreOption(name: "Foul on Black", points: -7, colors: [.black])
     ]
 
     private var hasEnoughPlayers: Bool {
@@ -162,7 +162,8 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(6)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
         .background(game.currentPlayerIndex == index && game.gameStarted ? Color.accentColor.opacity(0.15) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
@@ -230,6 +231,8 @@ struct ContentView: View {
                     }
                 }
             }
+            Spacer()
+                .frame(height: 6)
             Button(action: advanceTurn) {
                 Label("End Turn", systemImage: "forward.end.fill")
             }
@@ -287,7 +290,7 @@ struct ContentView: View {
             ForEach(Array(colors.enumerated()), id: \.offset) { _, color in
                 Circle()
                     .fill(color)
-                    .frame(width: 10, height: 10)
+                    .frame(width: 12, height: 12)
             }
         }
     }
@@ -327,7 +330,7 @@ struct ContentView: View {
                 Text("\(playerName(for: playerID)) potted")
                 Circle()
                     .fill(ballColor)
-                    .frame(width: 10, height: 10)
+                    .frame(width: 12, height: 12)
                 Text("for \(points) points")
             case let .foul(playerID, points):
                 Text("\(playerName(for: playerID)) fouled for \(points) points")
