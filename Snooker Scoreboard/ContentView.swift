@@ -231,24 +231,23 @@ struct ContentView: View {
                     .disabled(isPotDisabled(option: option))
                     .accessibilityIdentifier("pot-\(option.name.lowercased())")
                 }
-            }
-            if let ballOn = game.currentBallOn, game.enforceRules {
-                Button {
-                    if let freeBall = game.freeBallOption {
-                        applyFreeBall(option: freeBall)
+                if game.enforceRules {
+                    Button {
+                        if let freeBall = game.freeBallOption {
+                            applyFreeBall(option: freeBall)
+                        }
+                    } label: {
+                        HStack {
+                            scoreColorDots(colors: [game.currentBallOn?.color ?? .clear])
+                            Text("Free Ball: \(game.currentBallOn?.name ?? "—")")
+                            Spacer()
+                            Text("+\(game.currentBallOn?.points ?? 0)")
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                } label: {
-                    HStack {
-                        scoreColorDots(colors: [ballOn.color])
-                        Text("Free Ball: \(ballOn.name)")
-                        Spacer()
-                        Text("+\(ballOn.points)")
-                            .foregroundStyle(.secondary)
-                    }
+                    .disabled(!game.canUseFreeBall)
+                    .accessibilityIdentifier("free-ball-button")
                 }
-                .frame(minWidth: 130, maxWidth: .infinity, alignment: .leading)
-                .disabled(!game.canUseFreeBall)
-                .accessibilityIdentifier("free-ball-button")
             }
             Text("Foul")
                 .font(.subheadline)
@@ -270,36 +269,39 @@ struct ContentView: View {
                     .accessibilityIdentifier(foulIdentifier(for: option))
                 }
             }
-            if let ballOn = game.currentBallOn, game.enforceRules {
-                Button {
-                    applyOffTableFoul()
-                } label: {
-                    HStack {
-                        scoreColorDots(colors: [ballOn.color])
-                        Text("Off Table")
-                        Spacer()
-                        Text("-\(ballOn.points)")
-                            .foregroundStyle(.secondary)
+            if game.enforceRules {
+                let offTablePoints = max(4, game.currentBallOn?.points ?? 0)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: 12)], spacing: 12) {
+                    Button {
+                        applyOffTableFoul()
+                    } label: {
+                        HStack {
+                            scoreColorDots(colors: [game.currentBallOn?.color ?? .clear])
+                            Text("Off Table")
+                            Spacer()
+                            Text("-\(offTablePoints)")
+                                .foregroundStyle(.secondary)
+                        }
                     }
+                    .disabled(!game.canUseOffTableFoul)
+                    .accessibilityIdentifier("foul-off-table")
                 }
-                .frame(minWidth: 130, maxWidth: .infinity, alignment: .leading)
-                .disabled(!game.canUseOffTableFoul)
-                .accessibilityIdentifier("foul-off-table")
             }
             Spacer()
                 .frame(height: 6)
-            HStack(spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
                 Button(action: replayTurn) {
                     Label("Replay", systemImage: "gobackward")
                 }
-                .disabled(!game.canUseReplay)
-                .accessibilityIdentifier("replay-turn-button")
+                    .disabled(!game.canUseReplay)
+                    .accessibilityIdentifier("replay-turn-button")
                 Button(action: advanceTurn) {
                     Label("End Turn", systemImage: "forward.end.fill")
                 }
-                .disabled(!game.gameStarted || game.players.isEmpty)
-                .accessibilityIdentifier("end-turn-button")
+                    .disabled(!game.gameStarted || game.players.isEmpty)
+                    .accessibilityIdentifier("end-turn-button")
             }
+            .frame(maxWidth: .infinity)
         }
         .padding()
         .background(.thinMaterial)

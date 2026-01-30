@@ -371,7 +371,8 @@ final class ScoreboardGame: ObservableObject {
             finishedColors = true
         }
 
-        applyFoul(points: -ballOn.points)
+        let foulPoints = max(4, ballOn.points)
+        applyFoul(points: -foulPoints)
 
         if finishedColors {
             if isTieForLead {

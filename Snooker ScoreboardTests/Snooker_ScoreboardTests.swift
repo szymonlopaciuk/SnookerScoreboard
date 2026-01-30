@@ -145,7 +145,7 @@ struct Snooker_ScoreboardTests {
 
         #expect(game.redsRemaining == 14)
         #expect(game.potRequirement == .red)
-        #expect(game.players[1].score == 1)
+        #expect(game.players[1].score == 4)
     }
 
     @Test func enforceRulesBlocksInvalidPots() async throws {
