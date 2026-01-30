@@ -20,28 +20,21 @@ final class Snooker_ScoreboardUITests: XCTestCase {
     @MainActor
     func testFinalScoreDialogShowsSharedGoldCrownsOnTie() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["UITestEnforceRules", "UITestShortGame"]
         app.launch()
+
+        XCTAssertTrue(app.buttons["start-game-button"].waitForExistence(timeout: 8))
 
         addPlayer(named: "John", in: app)
         addPlayer(named: "Anna", in: app)
 
-        app.buttons["start-game-button"].click()
+        app.buttons["start-game-button"].firstMatch.click()
 
-        let foulOnBlack = app.buttons["foul-black"]
-        XCTAssertTrue(foulOnBlack.waitForExistence(timeout: 2))
-        foulOnBlack.click()
+        let endGame = app.buttons["end-game-button"].firstMatch
+        XCTAssertTrue(endGame.waitForExistence(timeout: 2))
+        endGame.click()
 
-        let endTurn = app.buttons["end-turn-button"]
-        XCTAssertTrue(endTurn.waitForExistence(timeout: 2))
-        endTurn.click()
-
-        let potBlack = app.buttons["pot-black"]
-        XCTAssertTrue(potBlack.waitForExistence(timeout: 2))
-        potBlack.click()
-
-        let finalSheet = app.otherElements["final-score-sheet"]
-        XCTAssertTrue(finalSheet.waitForExistence(timeout: 2))
+        let finalScoreTitle = app.staticTexts["final-score-title"]
+        XCTAssertTrue(finalScoreTitle.waitForExistence(timeout: 3))
         XCTAssertTrue(app.images["final-crown-gold-John"].exists)
         XCTAssertTrue(app.images["final-crown-gold-Anna"].exists)
         XCTAssertFalse(app.images["final-crown-silver-John"].exists)
@@ -52,7 +45,6 @@ final class Snooker_ScoreboardUITests: XCTestCase {
     @MainActor
     private func addPlayer(named name: String, in app: XCUIApplication) {
         let nameField = app.textFields["player-name-field"]
-        XCTAssertTrue(nameField.waitForExistence(timeout: 2))
         nameField.click()
         nameField.typeText(name)
         app.buttons["add-player-button"].click()

@@ -5,6 +5,7 @@
 //  Created by Szymon Łopaciuk on 29/01/2026.
 //
 
+import AppKit
 import Foundation
 import SwiftUI
 
@@ -69,6 +70,7 @@ struct ContentView: View {
         }
         .padding(20)
         .frame(maxHeight: .infinity)
+        .accessibilityIdentifier("content-root")
         .toolbar {
             ToolbarItemGroup {
                 Button(action: startGame) {
@@ -76,10 +78,11 @@ struct ContentView: View {
                 }
                     .disabled(game.gameStarted || !hasEnoughPlayers)
                     .accessibilityIdentifier("start-game-button")
-                Button(action: resetGame) {
-                    Label("New Game", systemImage: "xmark.octagon.fill")
+                Button(action: endGame) {
+                    Label("End Game", systemImage: "xmark.octagon.fill")
                 }
-                    .disabled(!game.gameStarted && game.players.isEmpty)
+                    .disabled(!game.gameStarted)
+                    .accessibilityIdentifier("end-game-button")
                 Button(action: undoLastAction) {
                     Label("Undo", systemImage: "arrow.uturn.backward")
                 }
@@ -101,6 +104,12 @@ struct ContentView: View {
             if ProcessInfo.processInfo.arguments.contains("UITestEnforceRules") {
                 enforceSnookerRules = true
                 game.enforceRules = true
+            }
+            if ProcessInfo.processInfo.arguments.contains("UITestMode") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    NSApp.activate(ignoringOtherApps: true)
+                    NSApp.windows.first?.makeKeyAndOrderFront(nil)
+                }
             }
             gameIsActive = game.gameStarted
         }
@@ -196,6 +205,7 @@ struct ContentView: View {
         .padding()
         .background(.thinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .contain)
     }
 
     private var scoreEntryCard: some View {
@@ -222,6 +232,24 @@ struct ContentView: View {
                     .accessibilityIdentifier("pot-\(option.name.lowercased())")
                 }
             }
+            if let ballOn = game.currentBallOn, game.enforceRules {
+                Button {
+                    if let freeBall = game.freeBallOption {
+                        applyFreeBall(option: freeBall)
+                    }
+                } label: {
+                    HStack {
+                        scoreColorDots(colors: [ballOn.color])
+                        Text("Free Ball: \(ballOn.name)")
+                        Spacer()
+                        Text("+\(ballOn.points)")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(minWidth: 130, maxWidth: .infinity, alignment: .leading)
+                .disabled(!game.canUseFreeBall)
+                .accessibilityIdentifier("free-ball-button")
+            }
             Text("Foul")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -242,14 +270,36 @@ struct ContentView: View {
                     .accessibilityIdentifier(foulIdentifier(for: option))
                 }
             }
+            if let ballOn = game.currentBallOn, game.enforceRules {
+                Button {
+                    applyOffTableFoul()
+                } label: {
+                    HStack {
+                        scoreColorDots(colors: [ballOn.color])
+                        Text("Off Table")
+                        Spacer()
+                        Text("-\(ballOn.points)")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(minWidth: 130, maxWidth: .infinity, alignment: .leading)
+                .disabled(!game.canUseOffTableFoul)
+                .accessibilityIdentifier("foul-off-table")
+            }
             Spacer()
                 .frame(height: 6)
-            Button(action: advanceTurn) {
-                Label("End Turn", systemImage: "forward.end.fill")
+            HStack(spacing: 12) {
+                Button(action: replayTurn) {
+                    Label("Replay", systemImage: "gobackward")
+                }
+                .disabled(!game.canUseReplay)
+                .accessibilityIdentifier("replay-turn-button")
+                Button(action: advanceTurn) {
+                    Label("End Turn", systemImage: "forward.end.fill")
+                }
+                .disabled(!game.gameStarted || game.players.isEmpty)
+                .accessibilityIdentifier("end-turn-button")
             }
-            .frame(maxWidth: .infinity, alignment: .center)
-            .disabled(!game.gameStarted || game.players.isEmpty)
-            .accessibilityIdentifier("end-turn-button")
         }
         .padding()
         .background(.thinMaterial)
@@ -280,6 +330,11 @@ struct ContentView: View {
         game.resetGame()
     }
 
+    private func endGame() {
+        game.endGame()
+        showGameOver = true
+    }
+
     private func applyPot(option: ScoreOption) {
         let color = option.colors.first ?? .clear
         game.applyPot(ballName: option.name, ballColor: color, points: option.points)
@@ -289,12 +344,24 @@ struct ContentView: View {
         game.applyFoul(points: points)
     }
 
+    private func applyFreeBall(option: FreeBallOption) {
+        game.applyFreeBall(option: option)
+    }
+
+    private func applyOffTableFoul() {
+        game.applyOffTableFoul()
+    }
+
     private func undoLastAction() {
         game.undoLastAction()
     }
 
     private func advanceTurn() {
         game.advanceTurn()
+    }
+
+    private func replayTurn() {
+        game.replayPreviousTurn()
     }
 
     private func scoreColorDots(colors: [Color]) -> some View {
@@ -393,6 +460,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Final Score")
                 .font(.title2)
+                .accessibilityLabel("final-score-title")
             List {
                 ForEach(Array(finalResults.enumerated()), id: \.element.id) { index, player in
                     HStack {
@@ -419,6 +487,7 @@ struct ContentView: View {
                 }
             }
         }
+        .accessibilityElement(children: .contain)
         .padding(20)
         .frame(minWidth: 360, minHeight: 300)
         .accessibilityIdentifier("final-score-sheet")

@@ -66,11 +66,11 @@ struct Snooker_ScoreboardTests {
         game.applyFoul(points: -4)
         game.undoLastAction()
 
-        #expect(game.players[0].score == 0)
+        #expect(game.players[0].score == 5)
         #expect(game.currentPlayerIndex == 0)
         #expect(game.foulCount(for: game.players[0].id) == 0)
         #expect(game.highestBreak(for: game.players[0].id) == 5)
-        #expect(game.actionHistory.isEmpty)
+        #expect(game.actionHistory.count == 1)
     }
 
     @Test func highestBreakResetsOnEndTurn() async throws {
@@ -117,6 +117,35 @@ struct Snooker_ScoreboardTests {
         #expect(game.highestBreak(for: game.players[0].id) == 8)
         #expect(game.currentBreaks[game.players[0].id] == 8)
         #expect(game.foulCount(for: game.players[0].id) == 0)
+    }
+
+    @Test func replayReturnsTurnToFoulingPlayer() async throws {
+        let game = ScoreboardGame()
+        game.addPlayer(name: "John")
+        game.addPlayer(name: "Anna")
+        game.startGame()
+
+        game.applyFoul(points: -4)
+
+        #expect(game.canUseReplay)
+        #expect(game.currentPlayerIndex == 1)
+        game.replayPreviousTurn()
+        #expect(game.currentPlayerIndex == 0)
+        #expect(!game.canUseReplay)
+    }
+
+    @Test func offTableFoulRemovesRed() async throws {
+        let game = ScoreboardGame()
+        game.addPlayer(name: "John")
+        game.addPlayer(name: "Anna")
+        game.startGame()
+        game.enforceRules = true
+
+        game.applyOffTableFoul()
+
+        #expect(game.redsRemaining == 14)
+        #expect(game.potRequirement == .red)
+        #expect(game.players[1].score == 1)
     }
 
     @Test func enforceRulesBlocksInvalidPots() async throws {
@@ -199,7 +228,7 @@ struct Snooker_ScoreboardTests {
         game.redsRemaining = 0
         game.potRequirement = .colorSequence(index: 5)
         game.players[0].score = 20
-        game.players[1].score = 20
+        game.players[1].score = 27
 
         game.applyPot(ballName: "Black", ballColor: .black, points: 7)
 
@@ -226,6 +255,42 @@ struct Snooker_ScoreboardTests {
         #expect(game.gameOver)
         #expect(!game.gameStarted)
         #expect(!game.respottedBlackActive)
+    }
+
+    @Test func freeBallCountsAsRedWhenRedsRemain() async throws {
+        let game = ScoreboardGame()
+        game.addPlayer(name: "John")
+        game.addPlayer(name: "Anna")
+        game.startGame()
+        game.enforceRules = true
+        game.applyFoul(points: -4)
+
+        let option = game.freeBallOption
+        #expect(game.currentPlayerIndex == 1)
+        #expect(option?.countsAsRed == true)
+        #expect(option?.name == "Red")
+        #expect(game.redsRemaining == 15)
+
+        if let option {
+            game.applyFreeBall(option: option)
+        }
+
+        #expect(game.redsRemaining == 15)
+        #expect(game.potRequirement == .color)
+    }
+
+    @Test func freeBallUsesCurrentBallOnAfterFoul() async throws {
+        let game = ScoreboardGame()
+        game.addPlayer(name: "John")
+        game.addPlayer(name: "Anna")
+        game.startGame()
+        game.enforceRules = true
+        game.redsRemaining = 10
+        game.potRequirement = .color
+        game.applyFoul(points: -4)
+
+        #expect(game.freeBallOption?.name == "Red")
+        #expect(game.freeBallOption?.points == 1)
     }
 
     @Test func availableColorsShrinkAfterSequenceStarts() async throws {
